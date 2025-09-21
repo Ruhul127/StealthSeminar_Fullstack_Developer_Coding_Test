@@ -1,3 +1,5 @@
+import { Product } from './Product';
+
 export interface Offer {
     productCode: string;
     type: 'halfPrice' | 'bogof' | string;

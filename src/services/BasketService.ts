@@ -1,37 +1,61 @@
-import { BasketService } from '../src/services/BasketService';
-import { products, deliveryRules, offers } from '../src/data/catalog';
+import { Product } from '../models/Product';
+import { DeliveryRule } from '../models/DeliveryRule';
+import { Offer } from '../models/Offer';
 
-describe('BasketService', () => {
-    let basket: BasketService;
+export class BasketService {
+    private items: Product[] = [];
 
-    beforeEach(() => {
-        basket = new BasketService(products, deliveryRules, offers);
-    });
+    constructor(
+        private products: Product[],
+        private deliveryRules: DeliveryRule[],
+        private offers: Offer[]
+    ) {}
 
-    test('should calculate total for B01, G01 correctly', () => {
-        basket.add('B01');
-        basket.add('G01');
-        expect(basket.total()).toBe(37.85);
-    });
+    add(productCode: string): void {
+        const product = this.products.find(p => p.code === productCode);
+        if (!product) {
+            throw new Error(`Product with code ${productCode} not found`);
+        }
+        this.items.push({...product}); // Add a copy to avoid reference issues
+    }
 
-    test('should calculate total for R01, R01 correctly', () => {
-        basket.add('R01');
-        basket.add('R01');
-        expect(basket.total()).toBe(54.37);
-    });
+    total(): number {
+        const subtotal = this.calculateSubtotal();
+        const discount = this.calculateDiscount();
+        const deliveryCost = this.calculateDeliveryCost(subtotal - discount);
+        
+        return this.roundToTwoDecimals(subtotal - discount + deliveryCost);
+    }
 
-    test('should calculate total for R01, G01 correctly', () => {
-        basket.add('R01');
-        basket.add('G01');
-        expect(basket.total()).toBe(60.85);
-    });
+    private calculateSubtotal(): number {
+        return this.roundToTwoDecimals(
+            this.items.reduce((sum, item) => sum + item.price, 0)
+        );
+    }
 
-    test('should calculate total for B01, B01, R01, R01, R01 correctly', () => {
-        basket.add('B01');
-        basket.add('B01');
-        basket.add('R01');
-        basket.add('R01');
-        basket.add('R01');
-        expect(basket.total()).toBe(98.27);
-    });
-});
+    private calculateDiscount(): number {
+        return this.roundToTwoDecimals(
+            this.offers.reduce((discount, offer) => discount + offer.apply(this.items), 0)
+        );
+    }
+
+    private calculateDeliveryCost(amount: number): number {
+        const rule = this.deliveryRules.find(
+            rule => amount >= rule.minAmount && amount < rule.maxAmount
+        );
+        return rule ? rule.cost : 0;
+    }
+
+    private roundToTwoDecimals(value: number): number {
+        return Math.round(value * 100) / 100;
+    }
+
+    clear(): void {
+        this.items = [];
+    }
+
+    // Helper method for testing
+    getItems(): Product[] {
+        return [...this.items]; // Return a copy to avoid direct manipulation
+    }
+}
